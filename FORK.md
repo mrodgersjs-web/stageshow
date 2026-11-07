@@ -45,3 +45,35 @@ Where it is wired in on this machine:
 ```sh
 git fetch upstream && git merge upstream/main   # origin = fork, upstream = benjitaylor/skills
 ```
+
+## Running the shot scripts here (resolved 2026-11-07, later the same day)
+
+The earlier note in this file said the shot scripts were not exercised because Chrome aborts
+inside the Aside agent shell (`exitCode=null, signal=SIGABRT`, and Playwright cannot even signal
+it: `exception while trying to kill process: Error: kill EPERM`). That is the agent sandbox's
+native-binary boundary, not a kit defect and not the pin.
+
+It runs after all, with no fork edit, because `scripts/browser.mjs` already honours `CHROME_PATH`:
+
+    export CHROME_PATH="$HOME/Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell"
+    npm run dev &
+    node scripts/film.mjs "http://127.0.0.1:4307/?capture=hero-demo" --out /tmp/ss-film.png --every 600 --count 6 --delay 500
+
+Playwright's own headless shell survives the sandbox where the desktop Chrome binary does not;
+`executablePath` bypasses the exact-revision check, so the cached 1248 shell serves playwright
+1.65 (if a later playwright refuses, `npx playwright install chromium-headless-shell` and point
+`CHROME_PATH` at the new directory).
+
+What that run proved, on this machine, 2026-11-07:
+
+- `npm run typecheck` - clean.
+- `npm run check:css` - clean: "class clash: no overlapping class namespaces detected (83 CSS files, 2 explicit bundles)".
+- `scripts/film.mjs` - shot a real contact sheet (6 frames at 600ms, 203 KB) and printed its own
+  coverage line: `coverage stage-1: 256 frames, 4.25s, largest gap 39.0ms (inconclusive)`.
+- `scripts/film.mjs --gate` - the rehearsal gate works and is honest: it failed the run on one
+  never-intentional line (`tight control: div.hd-popup-btn "Add" sits 6.0px under ... a button keeps
+  8px or more from the field`) and reported the caret's blink as a jump for a human to judge, rather
+  than passing it. `rehearsal failed: 1 never-intentional line(s) above`.
+
+So: install path is `npm install --ignore-scripts`, `xattr -dr com.apple.quarantine node_modules`,
+and `CHROME_PATH` at a Playwright headless shell for anything that shoots.
